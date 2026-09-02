@@ -40,14 +40,19 @@ target_link_libraries(freertos_kernel
 
 target_compile_definitions(freertos_kernel PUBLIC
     PICO_RP2040=1
+    PICO_DEFAULT_UART=0                  # Force UART instance 0
+    PICO_DEFAULT_UART_TX_PIN=0           # Force TX to GP0 (Pin 1)
+    PICO_DEFAULT_UART_RX_PIN=1           # Force RX to GP1 (Pin 2)
+    PICO_DEFAULT_UART_BAUD_RATE=115200   # Match default terminal baud rate
 )
 
 # Main executable
-add_executable(blink
-    src/blink.c
+add_executable(main
+    src/main.c
+    src/usb_descriptors.c
 )
 
-target_link_libraries(blink
+target_link_libraries(main
     freertos_kernel
     pico_stdlib
     pico_time
@@ -55,7 +60,8 @@ target_link_libraries(blink
     tinyusb_board
 )
 
-pico_enable_stdio_usb(blink 1)
-pico_enable_stdio_uart(blink 0)
+pico_enable_stdio_usb(main 0)
+pico_enable_stdio_uart(main 1)
+pico_enable_stdio_semihosting(main 0)
 
-pico_add_extra_outputs(blink)
+pico_add_extra_outputs(main)

@@ -22,6 +22,10 @@
           mkShell {
             buildInputs = [
               openssl
+
+              (pkgs.python3.withPackages (python-pkgs: [
+                python-pkgs.hid
+              ]))
               pkg-config
               minicom
               bear
