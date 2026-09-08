@@ -22,7 +22,8 @@
           mkShell {
             buildInputs = [
               openssl
-
+              sigrok-cli
+              surfer
               (pkgs.python3.withPackages (python-pkgs: [
                 python-pkgs.hid
               ]))

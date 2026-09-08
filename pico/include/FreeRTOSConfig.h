@@ -13,6 +13,17 @@
  * See http://www.freertos.org/a00110.html.
  *----------------------------------------------------------*/
 
+#define configNUMBER_OF_CORES 2
+#define configTICK_CORE 0
+#define configRUN_MULTIPLE_PRIORITIES 1
+#define configUSE_CORE_AFFINITY 1
+#define configUSE_PASSIVE_IDLE_HOOK 0
+#define portSUPPORT_SMP 1
+
+/* RP2040 specific integration */
+#define configSUPPORT_PICO_SYNC_INTEROP 1
+#define configSUPPORT_PICO_TIME_INTEROP 1
+
 #define configUSE_PREEMPTION 1
 #define configUSE_PORT_OPTIMISED_TASK_SELECTION 0
 #define configUSE_TICKLESS_IDLE 0

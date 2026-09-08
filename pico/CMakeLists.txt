@@ -23,19 +23,26 @@ add_library(freertos_kernel
     ${FREERTOS_KERNEL_PATH}/stream_buffer.c
     ${FREERTOS_KERNEL_PATH}/tasks.c
     ${FREERTOS_KERNEL_PATH}/timers.c
-    ${FREERTOS_KERNEL_PATH}/portable/GCC/ARM_CM0/port.c
-    ${FREERTOS_KERNEL_PATH}/portable/GCC/ARM_CM0/portasm.c
+    ${FREERTOS_KERNEL_PATH}/portable/ThirdParty/GCC/RP2040/port.c
     ${FREERTOS_KERNEL_PATH}/portable/MemMang/heap_4.c
 )
 
 target_include_directories(freertos_kernel PUBLIC
     ${FREERTOS_KERNEL_PATH}/include
-    ${FREERTOS_KERNEL_PATH}/portable/GCC/ARM_CM0
+    ${FREERTOS_KERNEL_PATH}/portable/ThirdParty/GCC/RP2040
+    ${FREERTOS_KERNEL_PATH}/portable/ThirdParty/GCC/RP2040/include
     ${CMAKE_CURRENT_LIST_DIR}/include
 )
 
 target_link_libraries(freertos_kernel
     pico_platform
+    pico_sync
+    pico_time
+    hardware_exception
+    hardware_sync
+    hardware_spi
+    pico_multicore
+    hardware_structs
 )
 
 target_compile_definitions(freertos_kernel PUBLIC
@@ -44,6 +51,7 @@ target_compile_definitions(freertos_kernel PUBLIC
     PICO_DEFAULT_UART_TX_PIN=0           # Force TX to GP0 (Pin 1)
     PICO_DEFAULT_UART_RX_PIN=1           # Force RX to GP1 (Pin 2)
     PICO_DEFAULT_UART_BAUD_RATE=115200   # Match default terminal baud rate
+
 )
 
 # Main executable

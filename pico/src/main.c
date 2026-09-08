@@ -9,11 +9,16 @@
 #include "task.h"
 #include "tusb.h"
 #include "usb_descriptors.h"
+#include <hardware/address_mapped.h>
 #include <hardware/gpio.h>
+#include <hardware/regs/spi.h>
+#include <hardware/spi.h>
 #include <hardware/structs/io_bank0.h>
 #include <hardware/uart.h>
 #include <pico/stdio.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #define LED_PIN PICO_DEFAULT_LED_PIN
 #define BLINK_DELAY_MS 500
@@ -21,26 +26,82 @@
 static void blink_task(void *pvParameters) {
   QueueHandle_t xQueue = (QueueHandle_t)pvParameters;
 
-  gpio_init(LED_PIN);
-  gpio_set_dir(LED_PIN, GPIO_OUT);
+  // gpio_init(LED_PIN);
+  // gpio_set_dir(LED_PIN, GPIO_OUT);
 
   hid_generic_report_t rep;
   rep.report_id = REPORT_ID_MOUSE;
   rep.len = sizeof(hid_mouse_report_t);
   mouse_clear(&rep.payload.mouse);
   for (;;) {
-    gpio_put(LED_PIN, 1);
-    printf("Move X by 10!\n");
-    mouse_move(&rep.payload.mouse, 10, 0);
-    xQueueSend(xQueue, &rep, 0);
-    mouse_clear_delta(&rep.payload.mouse);
+    // gpio_put(LED_PIN, 1);
+    // printf("Move X by 10!\n");
+    // mouse_move(&rep.payload.mouse, 10, 0);
+    // xQueueSend(xQueue, &rep, 0);
+    // mouse_clear_delta(&rep.payload.mouse);
+    // printf("[PICO] High!\n");
     vTaskDelay(pdMS_TO_TICKS(BLINK_DELAY_MS));
-    gpio_put(LED_PIN, 0);
-    printf("Move Y by 10!\n");
-    mouse_move(&rep.payload.mouse, 0, 10);
-    xQueueSend(xQueue, &rep, 0);
-    mouse_clear_delta(&rep.payload.mouse);
+    // gpio_put(LED_PIN, 0);
+    // printf("Move Y by 10!\n");
+    // mouse_move(&rep.payload.mouse, 0, 10);
+    // xQueueSend(xQueue, &rep, 0);
+    // mouse_clear_delta(&rep.payload.mouse);
+    // printf("[PICO] Low!\n");
     vTaskDelay(pdMS_TO_TICKS(BLINK_DELAY_MS));
+  }
+}
+
+typedef enum {
+  HEADER1,
+  HEADER2,
+  PAYLOAD,
+} state_t;
+
+static void spi_task(void *pvParameters) {
+  uart_init(uart1, 3000000);
+  gpio_set_function(4, GPIO_FUNC_UART);
+  gpio_set_function(5, GPIO_FUNC_UART);
+
+  gpio_init(LED_PIN);
+  gpio_set_dir(LED_PIN, GPIO_OUT);
+  uint8_t src[34] = {0};
+  state_t state = HEADER1;
+  for (;;) {
+    switch (state) {
+    case HEADER1:
+      uart_read_blocking(uart1, src, 1);
+      if (src[0] == 0xA5) {
+        state = HEADER2;
+      }
+      break;
+    case HEADER2:
+      uart_read_blocking(uart1, src + 1, 1);
+      if (src[1] == 0x55) {
+        state = PAYLOAD;
+      }
+      break;
+    case PAYLOAD:
+      uart_read_blocking(uart1, src + 2, 32);
+      // printf("[PICO] Bytes: [");
+      // for (int i = 2; i < 34; i++) {
+      //   if (i < 33) {
+      //     printf("%x, ", src[i]);
+      //   } else {
+      //     printf("%x]\n", src[i]);
+      //   }
+      // }
+      if (src[2] == 0x72) {
+        gpio_put(LED_PIN, true);
+      } else if (src[2] == 0x42) {
+        gpio_put(LED_PIN, false);
+      }
+      memset(src, 0, 34);
+      state = HEADER1;
+      break;
+    default:
+      state = HEADER1;
+      break;
+    }
   }
 }
 
@@ -77,11 +138,20 @@ int main(void) {
   stdio_init_all();
 
   QueueHandle_t queue = xQueueCreate(16, sizeof(hid_generic_report_t));
+  TaskHandle_t usb = NULL;
+  TaskHandle_t blink = NULL;
+  TaskHandle_t spi = NULL;
   xTaskCreate(usb_task, "USB", 2048, (void *)queue, configMAX_PRIORITIES - 2,
-              NULL);
+              &usb);
 
   xTaskCreate(blink_task, "Blink", 2048, (void *)queue, tskIDLE_PRIORITY + 1,
-              NULL);
+              &blink);
+  xTaskCreate(spi_task, "SPI", 2048, NULL, tskIDLE_PRIORITY + 2, &spi);
+
+  vTaskCoreAffinitySet(usb, 1 << 0);
+  vTaskCoreAffinitySet(blink, 1 << 0);
+  vTaskCoreAffinitySet(spi, 1 << 1);
+
   vTaskStartScheduler();
 
   for (;;) {
