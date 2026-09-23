@@ -4,18 +4,24 @@
 #include "class/hid/hid.h"
 #include "class/hid/hid_device.h"
 #include "device/usbd.h"
+#include "portmacro.h"
 #include "projdefs.h"
 #include "queue.h"
 #include "task.h"
 #include "tusb.h"
+#include "uart_task.h"
 #include "usb_descriptors.h"
 #include <hardware/address_mapped.h>
+#include <hardware/dma.h>
 #include <hardware/gpio.h>
+#include <hardware/irq.h>
+#include <hardware/regs/intctrl.h>
 #include <hardware/regs/spi.h>
 #include <hardware/spi.h>
 #include <hardware/structs/io_bank0.h>
 #include <hardware/uart.h>
 #include <pico/stdio.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -34,74 +40,37 @@ static void blink_task(void *pvParameters) {
   rep.len = sizeof(hid_mouse_report_t);
   mouse_clear(&rep.payload.mouse);
   for (;;) {
-    // gpio_put(LED_PIN, 1);
+    gpio_put(LED_PIN, 1);
     // printf("Move X by 10!\n");
     // mouse_move(&rep.payload.mouse, 10, 0);
     // xQueueSend(xQueue, &rep, 0);
     // mouse_clear_delta(&rep.payload.mouse);
-    // printf("[PICO] High!\n");
+    printf("[PICO] High!\n");
     vTaskDelay(pdMS_TO_TICKS(BLINK_DELAY_MS));
-    // gpio_put(LED_PIN, 0);
+    gpio_put(LED_PIN, 0);
     // printf("Move Y by 10!\n");
     // mouse_move(&rep.payload.mouse, 0, 10);
     // xQueueSend(xQueue, &rep, 0);
     // mouse_clear_delta(&rep.payload.mouse);
-    // printf("[PICO] Low!\n");
+    printf("[PICO] Low!\n");
     vTaskDelay(pdMS_TO_TICKS(BLINK_DELAY_MS));
   }
 }
 
-typedef enum {
-  HEADER1,
-  HEADER2,
-  PAYLOAD,
-} state_t;
+QueueHandle_t xUartQueue;
 
-static void spi_task(void *pvParameters) {
-  uart_init(uart1, 3000000);
-  gpio_set_function(4, GPIO_FUNC_UART);
-  gpio_set_function(5, GPIO_FUNC_UART);
-
-  gpio_init(LED_PIN);
-  gpio_set_dir(LED_PIN, GPIO_OUT);
-  uint8_t src[34] = {0};
-  state_t state = HEADER1;
+static void uart_task(void *pvParameters) {
   for (;;) {
-    switch (state) {
-    case HEADER1:
-      uart_read_blocking(uart1, src, 1);
-      if (src[0] == 0xA5) {
-        state = HEADER2;
+    uint8_t *packet = await_packet();
+    printf("Packet Received: [");
+    for (int i = 0; i < PACKET_SIZE; i++) {
+      if (i < PACKET_SIZE - 1) {
+        printf("%x, ", packet[i]);
+      } else {
+        printf("%x]\n", packet[i]);
       }
-      break;
-    case HEADER2:
-      uart_read_blocking(uart1, src + 1, 1);
-      if (src[1] == 0x55) {
-        state = PAYLOAD;
-      }
-      break;
-    case PAYLOAD:
-      uart_read_blocking(uart1, src + 2, 32);
-      // printf("[PICO] Bytes: [");
-      // for (int i = 2; i < 34; i++) {
-      //   if (i < 33) {
-      //     printf("%x, ", src[i]);
-      //   } else {
-      //     printf("%x]\n", src[i]);
-      //   }
-      // }
-      if (src[2] == 0x72) {
-        gpio_put(LED_PIN, true);
-      } else if (src[2] == 0x42) {
-        gpio_put(LED_PIN, false);
-      }
-      memset(src, 0, 34);
-      state = HEADER1;
-      break;
-    default:
-      state = HEADER1;
-      break;
     }
+    free_packet();
   }
 }
 
@@ -115,42 +84,37 @@ static void usb_task(void *pvParameters) {
     if (tud_hid_ready()) {
       if (xQueueReceive(xQueue, &rep, 0) == pdTRUE) {
         bool res = tud_hid_report(rep.report_id, &rep.payload, rep.len);
-        printf("Report ID: %d | Report status: %s\n", rep.report_id,
-               res ? "SUCCESS" : "FAILED");
+        // printf("Report ID: %d | Report status: %s\n", rep.report_id,
+        //        res ? "SUCCESS" : "FAILED");
       }
     }
     vTaskDelay(pdMS_TO_TICKS(1));
   }
 }
 
-void print_hex(const uint8_t *data, size_t len) {
-  for (size_t i = 0; i < len; i++) {
-    printf("%02X ", data[i]);
-  }
-  printf("\n");
-}
-
 int main(void) {
   board_init();
-  // uart_init(uart0, 115200);
-  gpio_set_function(0, GPIO_FUNC_UART);
-  gpio_set_function(1, GPIO_FUNC_UART);
-  stdio_init_all();
+
+  gpio_init(LED_PIN);
+  gpio_set_dir(LED_PIN, GPIO_OUT);
 
   QueueHandle_t queue = xQueueCreate(16, sizeof(hid_generic_report_t));
+  xUartQueue = xQueueCreate(128, sizeof(uint8_t));
   TaskHandle_t usb = NULL;
   TaskHandle_t blink = NULL;
-  TaskHandle_t spi = NULL;
+  TaskHandle_t uart = NULL;
   xTaskCreate(usb_task, "USB", 2048, (void *)queue, configMAX_PRIORITIES - 2,
               &usb);
 
   xTaskCreate(blink_task, "Blink", 2048, (void *)queue, tskIDLE_PRIORITY + 1,
               &blink);
-  xTaskCreate(spi_task, "SPI", 2048, NULL, tskIDLE_PRIORITY + 2, &spi);
+  xTaskCreate(uart_task, "UART", 2048, NULL, tskIDLE_PRIORITY + 2, &uart);
 
-  vTaskCoreAffinitySet(usb, 1 << 0);
-  vTaskCoreAffinitySet(blink, 1 << 0);
-  vTaskCoreAffinitySet(spi, 1 << 1);
+  start_uart_task(uart);
+  stdio_init_all();
+  // vTaskCoreAffinitySet(usb, 1 << 0);
+  // vTaskCoreAffinitySet(blink, 1 << 0);
+  // vTaskCoreAffinitySet(spi, 1 << 1);
 
   vTaskStartScheduler();
 

@@ -38,25 +38,29 @@ target_link_libraries(freertos_kernel
     pico_platform
     pico_sync
     pico_time
+    pico_stdlib
+    pico_multicore
     hardware_exception
     hardware_sync
     hardware_spi
-    pico_multicore
-    hardware_structs
+    hardware_dma
+    hardware_claim
+    pico_base_headers
 )
 
 target_compile_definitions(freertos_kernel PUBLIC
     PICO_RP2040=1
-    PICO_DEFAULT_UART=0                  # Force UART instance 0
-    PICO_DEFAULT_UART_TX_PIN=0           # Force TX to GP0 (Pin 1)
-    PICO_DEFAULT_UART_RX_PIN=1           # Force RX to GP1 (Pin 2)
-    PICO_DEFAULT_UART_BAUD_RATE=115200   # Match default terminal baud rate
-
+    PICO_DEFAULT_UART=0                 
+    PICO_DEFAULT_UART_TX_PIN=0           
+    PICO_DEFAULT_UART_RX_PIN=1           
+    PICO_DEFAULT_UART_BAUD_RATE=115200   
 )
 
 # Main executable
 add_executable(main
     src/main.c
+    ./src/uart_task.c
+    ./src/emulate.c
     src/usb_descriptors.c
 )
 
