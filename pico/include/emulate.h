@@ -24,10 +24,11 @@ typedef struct {
   key_state_t state;
 } key_command_t;
 
-#define MOUSE_COMMAND_SIZE 3
+#define MOUSE_COMMAND_SIZE 4
 typedef struct {
   int8_t x;
   int8_t y;
+  int8_t wheel;
 } mouse_command_t;
 
 #define BUTTON_COMMAND_SIZE 3
@@ -50,8 +51,9 @@ inline hid_command_t keyboard_command(uint8_t keycode, key_state_t state) {
                          .key = {.keycode = keycode, .state = state}};
 }
 
-inline hid_command_t mouse_command(int8_t x, int8_t y) {
-  return (hid_command_t){.type = MOUSE_COMMAND, .mouse = {.x = x, .y = y}};
+inline hid_command_t mouse_command(int8_t x, int8_t y, int8_t wheel) {
+  return (hid_command_t){.type = MOUSE_COMMAND,
+                         .mouse = {.x = x, .y = y, .wheel = wheel}};
 }
 
 inline hid_command_t button_command(uint8_t keycode, key_state_t state) {

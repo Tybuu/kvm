@@ -166,7 +166,7 @@ void test_mouse_movement(void) {
   hid_state_t state;
   memset(&state, 0, sizeof(state));
   hid_generic_report_t report;
-  hid_command_t command = mouse_command(-5, 2);
+  hid_command_t command = mouse_command(-5, 2, 3);
 
   bool res = generate_report(&state, &report, command);
 
@@ -179,7 +179,7 @@ void test_mouse_movement(void) {
   hid_mouse_report_t expected_mouse;
   expected_mouse.buttons = 0;
   expected_mouse.pan = 0;
-  expected_mouse.wheel = 0;
+  expected_mouse.wheel = 3;
   expected_mouse.x = -5;
   expected_mouse.y = 2;
   TEST_ASSERT_EQUAL(expected_mouse.buttons, report.payload.mouse.buttons);
@@ -206,6 +206,7 @@ void test_mouse_movement(void) {
   // Verify sending a zeroed delata move results in no report
   command.mouse.x = 0;
   command.mouse.y = 0;
+  command.mouse.wheel = 0;
   res = generate_report(&state, &report, command);
   TEST_ASSERT_FALSE(res);
 }
@@ -237,7 +238,7 @@ void test_mouse_buttons(void) {
   TEST_ASSERT_EQUAL(expected_mouse.y, report.payload.mouse.y);
 
   // Verify that sending mouse delta command doesn't affect button state
-  command = mouse_command(5, 2);
+  command = mouse_command(5, 2, 0);
   res = generate_report(&state, &report, command);
 
   TEST_ASSERT(res);
@@ -288,7 +289,7 @@ void test_deserialization(void) {
   buffer[0] = MOUSE_COMMAND;
   buffer[1] = -5;
   buffer[2] = 2;
-  actual_command = mouse_command(-5, 2);
+  actual_command = mouse_command(-5, 2, 0);
   res = deserialize_command(buffer, 3, &command);
   TEST_ASSERT(res);
   TEST_ASSERT_EQUAL(actual_command.type, command.type);

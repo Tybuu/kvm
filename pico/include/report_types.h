@@ -142,8 +142,10 @@ static inline bool mouse_release_button(hid_mouse_report_t *report,
   return prev != report->buttons;
 }
 
-static inline void mouse_move(hid_mouse_report_t *report, int8_t x, int8_t y) {
+static inline void mouse_move(hid_mouse_report_t *report, int8_t x, int8_t y,
+                              int8_t wheel) {
   report->x += x;
   report->y += y;
+  report->wheel += wheel;
 }
 #endif /* REPORT_TYPES_H */

@@ -20,7 +20,8 @@ bool generate_report(hid_state_t *state, hid_generic_report_t *report,
   }
   case MOUSE_COMMAND: {
     mouse_clear_delta(&state->mouse);
-    mouse_move(&state->mouse, command.mouse.x, command.mouse.y);
+    mouse_move(&state->mouse, command.mouse.x, command.mouse.y,
+               command.mouse.wheel);
     // We only want to send mouse reports if there's some delta change in the
     // command, would be a no-op otherwise
     if (command.mouse.x != 0 || command.mouse.y != 0) {
