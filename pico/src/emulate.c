@@ -48,7 +48,7 @@ bool generate_report(hid_state_t *state, hid_generic_report_t *report,
   }
 }
 
-bool deserialize_command(uint8_t *bytes, uint32_t len, hid_command_t *command) {
+bool deserialize_command(uint8_t *bytes, uint16_t len, hid_command_t *command) {
   if (len <= 1 || command == NULL) {
     return false;
   }

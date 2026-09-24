@@ -4,6 +4,7 @@
 #include "unity.h"
 #include "unity_internals.h"
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 
 #define KEYBOARD_A 0x04
@@ -269,6 +270,43 @@ void test_mouse_buttons(void) {
   TEST_ASSERT_EQUAL(expected_mouse.y, report.payload.mouse.y);
 }
 
+void test_deserialization(void) {
+  // Test keyboard deserialization
+  hid_command_t command;
+  uint8_t buffer[sizeof(hid_command_t)];
+  buffer[0] = KEYBOARD_COMMAND;
+  buffer[1] = KEYBOARD_A;
+  buffer[2] = PRESSED;
+  hid_command_t actual_command = keyboard_command(KEYBOARD_A, PRESSED);
+  bool res = deserialize_command(buffer, 3, &command);
+  TEST_ASSERT(res);
+  TEST_ASSERT_EQUAL(actual_command.type, command.type);
+  TEST_ASSERT_EQUAL(actual_command.key.keycode, command.key.keycode);
+  TEST_ASSERT_EQUAL(actual_command.key.state, command.key.state);
+
+  // Test mouse deserialization
+  buffer[0] = MOUSE_COMMAND;
+  buffer[1] = -5;
+  buffer[2] = 2;
+  actual_command = mouse_command(-5, 2);
+  res = deserialize_command(buffer, 3, &command);
+  TEST_ASSERT(res);
+  TEST_ASSERT_EQUAL(actual_command.type, command.type);
+  TEST_ASSERT_EQUAL(actual_command.key.keycode, command.key.keycode);
+  TEST_ASSERT_EQUAL(actual_command.key.state, command.key.state);
+
+  // Test mouse button  deserialization
+  buffer[0] = MOUSE_BUTTON_COMMAND;
+  buffer[1] = 3;
+  buffer[2] = PRESSED;
+  actual_command = button_command(3, PRESSED);
+  res = deserialize_command(buffer, 3, &command);
+  TEST_ASSERT(res);
+  TEST_ASSERT_EQUAL(actual_command.type, command.type);
+  TEST_ASSERT_EQUAL(actual_command.key.keycode, command.key.keycode);
+  TEST_ASSERT_EQUAL(actual_command.key.state, command.key.state);
+}
+
 int main(void) {
   UNITY_BEGIN();
   RUN_TEST(test_simple_keypress_and_release);
@@ -277,5 +315,6 @@ int main(void) {
   RUN_TEST(test_modifier_keypress);
   RUN_TEST(test_mouse_movement);
   RUN_TEST(test_mouse_buttons);
+  RUN_TEST(test_deserialization);
   return UNITY_END();
 }

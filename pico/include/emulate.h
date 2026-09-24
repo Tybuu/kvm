@@ -4,7 +4,6 @@
 #include "report_types.h"
 #include <stddef.h>
 #include <stdint.h>
-#include <sys/_intsup.h>
 
 typedef struct {
   hid_report_nkro_t nkro;
@@ -68,6 +67,6 @@ bool generate_report(hid_state_t *state, hid_generic_report_t *report,
 
 // Deserializes the byte stream into the passed in command. Returns true
 // if properly deserialized
-bool deserialize_command(uint8_t *bytes, uint32_t len, hid_command_t *command);
+bool deserialize_command(uint8_t *bytes, uint16_t len, hid_command_t *command);
 
 #endif // EMULATE_H

@@ -4,6 +4,7 @@
 #include "class/hid/hid.h"
 #include "class/hid/hid_device.h"
 #include "device/usbd.h"
+#include "emulate.h"
 #include "portmacro.h"
 #include "projdefs.h"
 #include "queue.h"
@@ -22,54 +23,49 @@
 #include <hardware/uart.h>
 #include <pico/stdio.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #define LED_PIN PICO_DEFAULT_LED_PIN
-#define BLINK_DELAY_MS 500
+// #define BLINK_DELAY_MS 500
+//
+// static void blink_task(void *pvParameters) {
+//   for (;;) {
+//     gpio_put(LED_PIN, 1);
+//     printf("[PICO] High!\n");
+//     vTaskDelay(pdMS_TO_TICKS(BLINK_DELAY_MS));
+//     gpio_put(LED_PIN, 0);
+//     printf("[PICO] Low!\n");
+//     vTaskDelay(pdMS_TO_TICKS(BLINK_DELAY_MS));
+//   }
+// }
 
-static void blink_task(void *pvParameters) {
-  QueueHandle_t xQueue = (QueueHandle_t)pvParameters;
-
-  // gpio_init(LED_PIN);
-  // gpio_set_dir(LED_PIN, GPIO_OUT);
-
-  hid_generic_report_t rep;
-  rep.report_id = REPORT_ID_MOUSE;
-  rep.len = sizeof(hid_mouse_report_t);
-  mouse_clear(&rep.payload.mouse);
+static void emulation_task(void *pvParameters) {
+  QueueHandle_t xCommandQueue = (QueueHandle_t)pvParameters;
+  hid_state_t state;
+  memset(&state, 0, sizeof(hid_state_t));
   for (;;) {
-    gpio_put(LED_PIN, 1);
-    // printf("Move X by 10!\n");
-    // mouse_move(&rep.payload.mouse, 10, 0);
-    // xQueueSend(xQueue, &rep, 0);
-    // mouse_clear_delta(&rep.payload.mouse);
-    printf("[PICO] High!\n");
-    vTaskDelay(pdMS_TO_TICKS(BLINK_DELAY_MS));
-    gpio_put(LED_PIN, 0);
-    // printf("Move Y by 10!\n");
-    // mouse_move(&rep.payload.mouse, 0, 10);
-    // xQueueSend(xQueue, &rep, 0);
-    // mouse_clear_delta(&rep.payload.mouse);
-    printf("[PICO] Low!\n");
-    vTaskDelay(pdMS_TO_TICKS(BLINK_DELAY_MS));
-  }
-}
-
-QueueHandle_t xUartQueue;
-
-static void uart_task(void *pvParameters) {
-  for (;;) {
-    uint8_t *packet = await_packet();
-    printf("Packet Received: [");
-    for (int i = 0; i < PACKET_SIZE; i++) {
-      if (i < PACKET_SIZE - 1) {
-        printf("%x, ", packet[i]);
-      } else {
-        printf("%x]\n", packet[i]);
+    hid_command_t command;
+    uart_packet_t packet = await_packet();
+    // printf("[PICO] Packet Received (length: %d): [", packet.len);
+    // for (int i = 0; i < packet.len; i++) {
+    //   if (i < packet.len - 1) {
+    //     printf("%x, ", packet.packet[i]);
+    //   } else {
+    //     printf("%x]\n", packet.packet[i]);
+    //   }
+    // }
+    bool valid_command =
+        deserialize_command(packet.packet, packet.len, &command);
+    free_packet(&packet);
+    if (valid_command) {
+      hid_generic_report_t rep;
+      if (generate_report(&state, &rep, command)) {
+        xQueueSend(xCommandQueue, &rep, 0);
       }
     }
-    free_packet();
   }
 }
 
@@ -98,16 +94,14 @@ int main(void) {
   gpio_set_dir(LED_PIN, GPIO_OUT);
 
   QueueHandle_t queue = xQueueCreate(16, sizeof(hid_generic_report_t));
-  xUartQueue = xQueueCreate(128, sizeof(uint8_t));
   TaskHandle_t usb = NULL;
-  TaskHandle_t blink = NULL;
   TaskHandle_t uart = NULL;
   xTaskCreate(usb_task, "USB", 2048, (void *)queue, configMAX_PRIORITIES - 2,
               &usb);
 
-  xTaskCreate(blink_task, "Blink", 2048, (void *)queue, tskIDLE_PRIORITY + 1,
-              &blink);
-  xTaskCreate(uart_task, "UART", 2048, NULL, tskIDLE_PRIORITY + 2, &uart);
+  // xTaskCreate(blink_task, "Blink", 2048, NULL, tskIDLE_PRIORITY + 1, NULL);
+  xTaskCreate(emulation_task, "Emulation", 2048, (void *)queue,
+              tskIDLE_PRIORITY + 2, &uart);
 
   start_uart_task(uart);
   stdio_init_all();

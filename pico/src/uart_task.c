@@ -10,8 +10,12 @@
 #include <hardware/regs/intctrl.h>
 #include <hardware/uart.h>
 #include <stdint.h>
+#include <stdio.h>
 // Packet Structure
-#define BUFFER_SIZE 8
+#define BUFFER_SIZE_LOG2 13
+#define BUFFER_SIZE (1 << BUFFER_SIZE_LOG2)
+
+#define HEADER_SIZE 3
 
 // UART Definitions
 #define UART_ID uart1
@@ -19,12 +23,12 @@
 #define TX_PIN 4
 #define RX_PIN 5
 typedef enum {
-  HEADER1,
-  HEADER2,
+  HEADER,
   PAYLOAD,
 } state_t;
 
-volatile static uint8_t packets[BUFFER_SIZE][PACKET_SIZE];
+volatile static uint8_t packets[BUFFER_SIZE]
+    __attribute__((aligned(BUFFER_SIZE)));
 volatile static uint32_t head;
 volatile static uint32_t tail;
 volatile static int dma_rx_chan;
@@ -37,41 +41,47 @@ void on_uart_rx_dma() {
   if (dma_channel_get_irq0_status(dma_rx_chan)) {
     dma_channel_acknowledge_irq0(dma_rx_chan);
     switch (state) {
-    case HEADER1:
-      if (packets[tail][0] == 0xA5) {
-        state = HEADER2;
-      }
-      // Rewrite the address and restart as DMA automatically increments the
-      // write address
-      dma_channel_set_write_addr(dma_rx_chan, packets[tail], true);
-      break;
-    case HEADER2:
-      if (packets[tail][0] == 0x55) {
+    case HEADER:
+      if (packets[tail] == 0xA5 && packets[(tail + 1) % BUFFER_SIZE] == 0x55) {
         state = PAYLOAD;
-        dma_channel_set_write_addr(dma_rx_chan, packets[tail], false);
-        dma_channel_set_trans_count(dma_rx_chan, PACKET_SIZE, true);
-      } else if (packets[tail][0] == 0xA5) {
-        state = HEADER2;
-        dma_channel_set_write_addr(dma_rx_chan, packets[tail], true);
+        packets[tail] = packets[(tail + 2) % BUFFER_SIZE];
+        dma_channel_set_trans_count(dma_rx_chan, packets[tail], false);
+        dma_channel_set_write_addr(dma_rx_chan,
+                                   &packets[(tail + 1) % BUFFER_SIZE], true);
+      } else if (packets[(tail + 2) % BUFFER_SIZE] == 0xA5) {
+        state = HEADER;
+        packets[tail] = 0xA5;
+        packets[(tail + 1) % BUFFER_SIZE] = 0x0;
+        dma_channel_set_trans_count(dma_rx_chan, HEADER_SIZE - 1, false);
+        dma_channel_set_write_addr(dma_rx_chan,
+                                   &packets[(tail + 1) % BUFFER_SIZE], true);
+      } else if (packets[(tail + 1) % BUFFER_SIZE] == 0xA5 &&
+                 packets[(tail + 2) % BUFFER_SIZE] == 0x55) {
+        packets[tail] = 0xA5;
+        packets[(tail + 1) % BUFFER_SIZE] = 0x55;
+        packets[(tail + 2) % BUFFER_SIZE] = 0x0;
+        dma_channel_set_trans_count(dma_rx_chan, 1, false);
+        dma_channel_set_write_addr(dma_rx_chan,
+                                   &packets[(tail + 2) % BUFFER_SIZE], true);
       } else {
-        state = HEADER1;
-        dma_channel_set_write_addr(dma_rx_chan, packets[tail], true);
+        dma_channel_set_trans_count(dma_rx_chan, HEADER_SIZE, false);
+        dma_channel_set_write_addr(dma_rx_chan, &packets[tail], true);
       }
       break;
     case PAYLOAD:
       // TODO: Add check to prevent the DMA from starting up a new request when
       // full. free_packet should set it up instead
-      state = HEADER1;
-      tail = (tail + 1) % BUFFER_SIZE;
-      dma_channel_set_write_addr(dma_rx_chan, packets[tail], false);
-      dma_channel_set_trans_count(dma_rx_chan, 1, true);
+      state = HEADER;
+      tail = (tail + packets[tail] + 1) % BUFFER_SIZE;
+      dma_channel_set_write_addr(dma_rx_chan, &packets[tail], false);
+      dma_channel_set_trans_count(dma_rx_chan, HEADER_SIZE, true);
 
       if (xTaskHandle != NULL) {
         vTaskNotifyGiveFromISR(xTaskHandle, &xHigherPriorityTaskWoken);
       }
       break;
     default:
-      state = HEADER1;
+      state = HEADER;
       break;
     }
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
@@ -82,7 +92,7 @@ void start_uart_task(TaskHandle_t task) {
   // Initialize global state
   head = 0;
   tail = 0;
-  state = HEADER1;
+  state = HEADER;
   xTaskHandle = task;
 
   // Initialize UART
@@ -103,6 +113,8 @@ void start_uart_task(TaskHandle_t task) {
   channel_config_set_read_increment(&c, false);
   channel_config_set_write_increment(&c, true);
 
+  channel_config_set_ring(&c, true, BUFFER_SIZE_LOG2);
+
   // Enable DMA interrupts
   channel_config_set_dreq(&c, dreq_uart_rx);
   irq_set_exclusive_handler(DMA_IRQ_0, on_uart_rx_dma);
@@ -110,16 +122,20 @@ void start_uart_task(TaskHandle_t task) {
   dma_channel_set_irq0_enabled(dma_rx_chan, true);
 
   // Start the DMA task
-  dma_channel_configure(dma_rx_chan, &c, packets[0], &uart_get_hw(UART_ID)->dr,
-                        1, true);
+  dma_channel_configure(dma_rx_chan, &c, &packets[tail],
+                        &uart_get_hw(UART_ID)->dr, HEADER_SIZE, true);
 }
 
-uint8_t *await_packet() {
+uart_packet_t await_packet() {
   // Every proper packet will send a notifcation which acts like a semaphore
   // so we can just take a notifcation to determine if there's currently
   // a valid packet or we can just await for a packet
   ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
-  return (uint8_t *)packets[head];
+  return (uart_packet_t){.len = packets[head], (uint8_t *)&packets[head + 1]};
 }
 
-void free_packet() { head = (head + 1) % BUFFER_SIZE; }
+void free_packet(uart_packet_t *packet) {
+  packet->packet = NULL;
+  packet->len = 0;
+  head = (head + packets[head] + 1) % BUFFER_SIZE;
+}
