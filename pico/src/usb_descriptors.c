@@ -1,7 +1,7 @@
-#include "usb_descriptors.h"
 #include "bsp/board_api.h"
 #include "class/hid/hid.h"
 #include "class/hid/hid_device.h"
+#include "report_types.h"
 #include "tusb.h"
 #include <stdint.h>
 #include <string.h>

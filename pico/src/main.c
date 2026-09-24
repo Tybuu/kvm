@@ -7,10 +7,10 @@
 #include "portmacro.h"
 #include "projdefs.h"
 #include "queue.h"
+#include "report_types.h"
 #include "task.h"
 #include "tusb.h"
 #include "uart_task.h"
-#include "usb_descriptors.h"
 #include <hardware/address_mapped.h>
 #include <hardware/dma.h>
 #include <hardware/gpio.h>
@@ -24,7 +24,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 
 #define LED_PIN PICO_DEFAULT_LED_PIN
 #define BLINK_DELAY_MS 500
