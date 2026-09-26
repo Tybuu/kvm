@@ -131,6 +131,7 @@ uart_packet_t await_packet() {
   // so we can just take a notifcation to determine if there's currently
   // a valid packet or we can just await for a packet
   ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
+  // Packet structure is [len, packet[0], .., packet[len-1]] starting from head
   return (uart_packet_t){.len = packets[head], (uint8_t *)&packets[head + 1]};
 }
 

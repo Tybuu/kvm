@@ -43,7 +43,7 @@
 // }
 
 static void emulation_task(void *pvParameters) {
-  QueueHandle_t xCommandQueue = (QueueHandle_t)pvParameters;
+  QueueHandle_t xReportQueue = (QueueHandle_t)pvParameters;
   hid_state_t state;
   memset(&state, 0, sizeof(hid_state_t));
   for (;;) {
@@ -63,7 +63,7 @@ static void emulation_task(void *pvParameters) {
     if (valid_command) {
       hid_generic_report_t rep;
       if (generate_report(&state, &rep, command)) {
-        xQueueSend(xCommandQueue, &rep, 0);
+        xQueueSend(xReportQueue, &rep, 0);
       }
     }
   }
