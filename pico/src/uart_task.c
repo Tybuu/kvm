@@ -32,6 +32,7 @@ volatile static uint8_t packets[BUFFER_SIZE]
 volatile static uint32_t head;
 volatile static uint32_t tail;
 volatile static int dma_rx_chan;
+
 static state_t state;
 static TaskHandle_t xTaskHandle = NULL;
 

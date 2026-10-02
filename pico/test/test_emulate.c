@@ -290,7 +290,7 @@ void test_deserialization(void) {
   buffer[1] = -5;
   buffer[2] = 2;
   actual_command = mouse_command(-5, 2, 0);
-  res = deserialize_command(buffer, 3, &command);
+  res = deserialize_command(buffer, 4, &command);
   TEST_ASSERT(res);
   TEST_ASSERT_EQUAL(actual_command.type, command.type);
   TEST_ASSERT_EQUAL(actual_command.key.keycode, command.key.keycode);

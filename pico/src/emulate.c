@@ -71,6 +71,7 @@ bool deserialize_command(uint8_t *bytes, uint16_t len, hid_command_t *command) {
     command->type = MOUSE_COMMAND;
     command->mouse.x = bytes[1];
     command->mouse.y = bytes[2];
+    command->mouse.wheel = bytes[3];
     return true;
     break;
   }

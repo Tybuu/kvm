@@ -1,29 +1,25 @@
-#include <cstddef>
+#include "uart.hpp"
+#include <chrono>
+#include <cstdint>
+#include <cstring>
 #include <fcntl.h>
 #include <iostream>
-#include <libevdev/libevdev.h>
+#include <libudev.h>
+#include <ratio>
+#include <termios.h>
+#include <thread>
 #include <unistd.h>
 
 int main() {
-  int fd;
-  for (int i = 0; i < 32; i++) {
-    std::string path = "/dev/input/event" + std::to_string(i);
+  std::cout << "Hello there!\n";
 
-    int fd = open(path.c_str(), O_RDONLY | O_NONBLOCK);
-
-    if (fd < 0) {
-      continue;
-    }
-    struct libevdev *dev = NULL;
-    if (libevdev_new_from_fd(fd, &dev) < 0) {
-      close(fd);
-      continue;
-    }
-    std::cout << "Found Device: " << path << " -> " << libevdev_get_name(dev)
-              << "\n";
-    libevdev_free(dev);
-    close(fd);
+  // TODO: Use libudev to enumerate through all possible devices
+  Uart uart = Uart("/dev/ttyAMA0");
+  while (true) {
+    uint8_t bytes[] = {5, 4, 9, 2, 3, 8};
+    uart.write_bytes(bytes, sizeof(bytes));
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    std::cout << "Wrote bytes!\n";
   }
-
   return 0;
 }
