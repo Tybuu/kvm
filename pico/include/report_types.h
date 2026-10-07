@@ -17,15 +17,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#ifndef _TUSB_HID_H_
 typedef struct __attribute__((packed)) {
   uint8_t buttons;
-  int8_t x;
-  int8_t y;
-  int8_t wheel;
+  int16_t x;
+  int16_t y;
+  int16_t wheel;
   int8_t pan;
-} hid_mouse_report_t;
-#endif
+} hid_mouse_rep_t;
 #define NKRO_KEY_COUNT 248
 #define NKRO_BYTE_COUNT (NKRO_KEY_COUNT / 8)
 
@@ -44,7 +42,7 @@ typedef struct {
   uint8_t len;
   union {
     hid_report_nkro_t nkro;
-    hid_mouse_report_t mouse;
+    hid_mouse_rep_t mouse;
     uint8_t vendor[64];
   } payload;
 } hid_generic_report_t;
@@ -59,10 +57,10 @@ static inline void set_generic_nkro(hid_generic_report_t *rep,
 }
 
 static inline void set_generic_mouse(hid_generic_report_t *rep,
-                                     hid_mouse_report_t *mouse) {
+                                     hid_mouse_rep_t *mouse) {
   rep->payload.mouse = *mouse;
   rep->report_id = REPORT_ID_MOUSE;
-  rep->len = sizeof(hid_mouse_report_t);
+  rep->len = sizeof(hid_mouse_rep_t);
 }
 
 static inline void set_generic_inout(hid_generic_report_t *rep,
@@ -118,31 +116,30 @@ static inline bool nkro_release_key(hid_report_nkro_t *report, uint8_t key) {
   }
 }
 
-static inline void mouse_clear(hid_mouse_report_t *report) {
-  memset(report, 0, sizeof(hid_mouse_report_t));
+static inline void mouse_clear(hid_mouse_rep_t *report) {
+  memset(report, 0, sizeof(hid_mouse_rep_t));
 }
 
-static inline void mouse_clear_delta(hid_mouse_report_t *report) {
+static inline void mouse_clear_delta(hid_mouse_rep_t *report) {
   report->x = 0;
   report->y = 0;
   report->wheel = 0;
   report->pan = 0;
 }
 
-static inline bool mouse_press_button(hid_mouse_report_t *report, uint8_t key) {
+static inline bool mouse_press_button(hid_mouse_rep_t *report, uint8_t key) {
   uint8_t prev = report->buttons;
   report->buttons |= key;
   return prev != report->buttons;
 }
 
-static inline bool mouse_release_button(hid_mouse_report_t *report,
-                                        uint8_t key) {
+static inline bool mouse_release_button(hid_mouse_rep_t *report, uint8_t key) {
   uint8_t prev = report->buttons;
   report->buttons &= ~key;
   return prev != report->buttons;
 }
 
-static inline void mouse_move(hid_mouse_report_t *report, int8_t x, int8_t y,
+static inline void mouse_move(hid_mouse_rep_t *report, int8_t x, int8_t y,
                               int8_t wheel) {
   report->x += x;
   report->y += y;

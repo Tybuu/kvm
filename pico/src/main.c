@@ -49,38 +49,51 @@ static void emulation_task(void *pvParameters) {
   for (;;) {
     hid_command_t command;
     uart_packet_t packet = await_packet();
-    // printf("[PICO] Packet Received (length: %d): [", packet.len);
-    // for (int i = 0; i < packet.len; i++) {
-    //   if (i < packet.len - 1) {
-    //     printf("%x, ", packet.packet[i]);
-    //   } else {
-    //     printf("%x]\n", packet.packet[i]);
-    //   }
-    // }
-    bool valid_command =
-        deserialize_command(packet.packet, packet.len, &command);
-    free_packet(&packet);
-    if (valid_command) {
-      hid_generic_report_t rep;
-      if (generate_report(&state, &rep, command)) {
-        xQueueSend(xReportQueue, &rep, 0);
+    printf("[PICO] Packet Received (length: %d): [", packet.len);
+    for (int i = 0; i < packet.len; i++) {
+      if (i < packet.len - 1) {
+        printf("%x, ", packet.packet[i]);
+      } else {
+        printf("%x]\n", packet.packet[i]);
       }
     }
+    // bool valid_command =
+    //     deserialize_command(packet.packet, packet.len, &command);
+    free_packet(&packet);
+    // if (valid_command) {
+    //   hid_generic_report_t rep;
+    //   if (generate_report(&state, &rep, command)) {
+    //     xQueueSend(xReportQueue, &rep, 0);
+    //   }
+    // }
   }
 }
 
 static void usb_task(void *pvParameters) {
   QueueHandle_t xQueue = (QueueHandle_t)pvParameters;
-  hid_generic_report_t rep;
+  uart_packet_t packet;
   tusb_init();
 
   for (;;) {
     tud_task();
     if (tud_hid_ready()) {
-      if (xQueueReceive(xQueue, &rep, 0) == pdTRUE) {
-        bool res = tud_hid_report(rep.report_id, &rep.payload, rep.len);
-        // printf("Report ID: %d | Report status: %s\n", rep.report_id,
+      packet = await_packet();
+      if (packet.packet != NULL) {
+        // printf("[PICO] Packet Received (length: %d): [", packet.len);
+        // for (int i = 0; i < packet.len; i++) {
+        //   if (i < packet.len - 1) {
+        //     printf("%x, ", packet.packet[i]);
+        //   } else {
+        //     printf("%x]\n", packet.packet[i]);
+        //   }
+        // }
+        // gpio_put(LED_PIN, true);
+        bool res = tud_hid_report(packet.packet[0], &packet.packet[2],
+                                  packet.packet[1]);
+        // printf("Report ID: %d | Report status: %s\n",
+        // rep.report_id,
         //        res ? "SUCCESS" : "FAILED");
+        free_packet(&packet);
       }
     }
     vTaskDelay(pdMS_TO_TICKS(1));
@@ -100,10 +113,10 @@ int main(void) {
               &usb);
 
   // xTaskCreate(blink_task, "Blink", 2048, NULL, tskIDLE_PRIORITY + 1, NULL);
-  xTaskCreate(emulation_task, "Emulation", 2048, (void *)queue,
-              tskIDLE_PRIORITY + 2, &uart);
+  // xTaskCreate(emulation_task, "Emulation", 2048, (void *)queue,
+  //             tskIDLE_PRIORITY + 2, &uart);
 
-  start_uart_task(uart);
+  start_uart_task(usb);
   stdio_init_all();
   // vTaskCoreAffinitySet(usb, 1 << 0);
   // vTaskCoreAffinitySet(blink, 1 << 0);

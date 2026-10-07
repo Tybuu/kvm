@@ -1,9 +1,9 @@
 #pragma once
 
-#include <cstddef>
+#include "poll.hpp"
 #include <cstdint>
 #include <filesystem>
-class Uart {
+class Uart : public Poll::WriteInterface {
 private:
   int fd_ = -1;
 
@@ -16,7 +16,7 @@ public:
 
   ~Uart();
 
-  void write_bytes(const uint8_t *bytes, const uint8_t len);
+  void WriteBytes(const std::uint8_t *bytes, const uint8_t len) override;
 
   // TODO: Implement read packet
   // void read_packet(uint8_t *bytes, const size_t len);

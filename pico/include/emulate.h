@@ -7,7 +7,7 @@
 
 typedef struct {
   hid_report_nkro_t nkro;
-  hid_mouse_report_t mouse;
+  hid_mouse_rep_t mouse;
 } hid_state_t;
 
 typedef enum {
@@ -24,11 +24,11 @@ typedef struct {
   key_state_t state;
 } key_command_t;
 
-#define MOUSE_COMMAND_SIZE 4
+#define MOUSE_COMMAND_SIZE 7
 typedef struct {
-  int8_t x;
-  int8_t y;
-  int8_t wheel;
+  int16_t x;
+  int16_t y;
+  int16_t wheel;
 } mouse_command_t;
 
 #define BUTTON_COMMAND_SIZE 3
@@ -51,7 +51,7 @@ inline hid_command_t keyboard_command(uint8_t keycode, key_state_t state) {
                          .key = {.keycode = keycode, .state = state}};
 }
 
-inline hid_command_t mouse_command(int8_t x, int8_t y, int8_t wheel) {
+inline hid_command_t mouse_command(int16_t x, int16_t y, int16_t wheel) {
   return (hid_command_t){.type = MOUSE_COMMAND,
                          .mouse = {.x = x, .y = y, .wheel = wheel}};
 }

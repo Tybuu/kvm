@@ -6,11 +6,12 @@
 
 #include <cstring>
 #include <fcntl.h>
+#include <linux/serial.h>
 #include <termios.h>
 #include <unistd.h>
 
 Uart::Uart(const std::filesystem::path dev) {
-  fd_ = open(dev.c_str(), O_RDWR | O_NOCTTY);
+  fd_ = open(dev.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
   if (fd_ <= -1) {
     throw std::runtime_error("Error opening serial port " + dev.string());
   }
@@ -37,7 +38,7 @@ Uart::Uart(const std::filesystem::path dev) {
   tty.c_lflag &= ~ECHONL;
   tty.c_lflag &= ~ISIG;
 
-  tty.c_oflag &= ~(IXON | IXOFF | IXANY);
+  tty.c_iflag &= ~(IXON | IXOFF | IXANY);
   tty.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL);
 
   tty.c_oflag &= ~OPOST;
@@ -50,9 +51,15 @@ Uart::Uart(const std::filesystem::path dev) {
     close(fd_);
     throw std::runtime_error("Unable to set attr for " + std::to_string(fd_));
   }
+
+  struct serial_struct serial;
+  if (ioctl(fd_, TIOCGSERIAL, &serial) == 0) {
+    serial.flags |= ASYNC_LOW_LATENCY;
+    ioctl(fd_, TIOCSSERIAL, &serial);
+  }
 }
 
-void Uart::write_bytes(const uint8_t *bytes, const uint8_t len) {
+void Uart::WriteBytes(const uint8_t *bytes, const uint8_t len) {
   int bytes_written = 0;
   if (bytes == nullptr || len <= 0) {
     return;

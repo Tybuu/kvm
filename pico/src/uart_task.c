@@ -131,9 +131,14 @@ uart_packet_t await_packet() {
   // Every proper packet will send a notifcation which acts like a semaphore
   // so we can just take a notifcation to determine if there's currently
   // a valid packet or we can just await for a packet
-  ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
+  // int res = ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
+  int res = ulTaskNotifyTake(pdFALSE, 0);
   // Packet structure is [len, packet[0], .., packet[len-1]] starting from head
-  return (uart_packet_t){.len = packets[head], (uint8_t *)&packets[head + 1]};
+  if (res == 0) {
+    return (uart_packet_t){.len = 0, .packet = NULL};
+  } else {
+    return (uart_packet_t){.len = packets[head], (uint8_t *)&packets[head + 1]};
+  }
 }
 
 void free_packet(uart_packet_t *packet) {

@@ -23,6 +23,7 @@
               cmake
               pkg-config
               minicom
+              gdb
             ];
             buildInputs = with pkgs; [
               openssl
