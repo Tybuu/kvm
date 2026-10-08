@@ -36,12 +36,26 @@ int EpollInstance::epoll_init() {
   return fd;
 }
 
-void EpollInstance::AddReadDevice(std::unique_ptr<Poll::PollDevice> dev) {
+void EpollInstance::AddDevice(std::unique_ptr<Poll::PollDevice> dev) {
   struct epoll_event ev;
   ev.events = EPOLLIN | EPOLLRDHUP;
   ev.data.ptr = (void *)dev.get();
   epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, dev->fd(), &ev);
   map_[dev->fd()] = std::move(dev);
+}
+
+void EpollInstance::AddDeviceUnmanaged(PollDevice *dev) {
+  struct epoll_event ev;
+  ev.events = EPOLLIN | EPOLLRDHUP;
+  ev.data.ptr = (void *)dev;
+  epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, dev->fd(), &ev);
+}
+
+void EpollInstance::SetWrite(int fd, bool enable, PollDevice *instance) {
+  struct epoll_event ev;
+  ev.events = EPOLLIN | EPOLLRDHUP | (enable ? EPOLLOUT : 0);
+  ev.data.ptr = instance;
+  epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, fd, &ev);
 }
 
 void EpollInstance::RemoveDevice(int fd) {
@@ -51,7 +65,6 @@ void EpollInstance::RemoveDevice(int fd) {
 }
 
 void EpollInstance::Run() {
-  // TODO: Add Remove Queue
   epoll_event events[NUM_EVENTS];
   std::vector<int> delete_queue;
   delete_queue.reserve(NUM_EVENTS);
@@ -78,7 +91,8 @@ void EvdevPollDevice::OnPoll() {
   do {
     res = libevdev_next_event(dev_, LIBEVDEV_READ_FLAG_NORMAL, &ev);
     if (res == LIBEVDEV_READ_STATUS_SUCCESS) {
-      uint8_t res = rep_.GenerateReport(ev, buffer);
+      HidStructs::HidState evt = handler_->HandleEvEvent(ev);
+      uint8_t res = rep_.GenerateReport(evt, buffer);
       if (res != 0) {
         writer_.WriteBytes(buffer, res);
       }
@@ -128,18 +142,22 @@ UdevPollDevice::UdevPollDevice(EpollInstance &poll, HidStructs::HidReport &rep,
           if (libevdev_new_from_fd(fd, &evdev) >= 0) {
             int is_key = libevdev_has_event_code(evdev, EV_KEY, KEY_A);
             int is_mouse = libevdev_has_event_code(evdev, EV_REL, REL_X);
-            if (is_key || is_mouse) {
+            if (is_key) {
               std::cout << "Opened Keyboard device: "
                         << libevdev_get_name(evdev) << std::endl;
+              auto key = std::make_unique<HidStructs::KeyboardPollDevice>();
               std::unique_ptr<EvdevPollDevice> ptr =
-                  std::make_unique<EvdevPollDevice>(fd, evdev, rep_, writer_);
-              poll_.AddReadDevice(std::move(ptr));
+                  std::make_unique<EvdevPollDevice>(fd, evdev, rep_,
+                                                    std::move(key), writer_);
+              poll_.AddDevice(std::move(ptr));
             } else if (is_mouse) {
               std::cout << "Opened Mouse device: " << libevdev_get_name(evdev)
                         << std::endl;
+              auto mouse = std::make_unique<HidStructs::MousePollDevice>();
               std::unique_ptr<EvdevPollDevice> ptr =
-                  std::make_unique<EvdevPollDevice>(fd, evdev, rep_, writer_);
-              poll_.AddReadDevice(std::move(ptr));
+                  std::make_unique<EvdevPollDevice>(fd, evdev, rep_,
+                                                    std::move(mouse), writer_);
+              poll_.AddDevice(std::move(ptr));
             }
           }
         }
@@ -181,18 +199,22 @@ void UdevPollDevice::OnPoll() {
           } else {
             int is_key = libevdev_has_event_code(evdev, EV_KEY, KEY_A);
             int is_mouse = libevdev_has_event_code(evdev, EV_REL, REL_X);
-            if (is_key || is_mouse) {
+            if (is_key) {
               std::cout << "Opened Keyboard device: "
                         << libevdev_get_name(evdev) << std::endl;
+              auto key = std::make_unique<HidStructs::KeyboardPollDevice>();
               std::unique_ptr<EvdevPollDevice> ptr =
-                  std::make_unique<EvdevPollDevice>(fd, evdev, rep_, writer_);
-              poll_.AddReadDevice(std::move(ptr));
+                  std::make_unique<EvdevPollDevice>(fd, evdev, rep_,
+                                                    std::move(key), writer_);
+              poll_.AddDevice(std::move(ptr));
             } else if (is_mouse) {
               std::cout << "Opened Mouse device: " << libevdev_get_name(evdev)
                         << std::endl;
+              auto mouse = std::make_unique<HidStructs::MousePollDevice>();
               std::unique_ptr<EvdevPollDevice> ptr =
-                  std::make_unique<EvdevPollDevice>(fd, evdev, rep_, writer_);
-              poll_.AddReadDevice(std::move(ptr));
+                  std::make_unique<EvdevPollDevice>(fd, evdev, rep_,
+                                                    std::move(mouse), writer_);
+              poll_.AddDevice(std::move(ptr));
             }
           }
         }

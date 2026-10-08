@@ -27,14 +27,31 @@ public:
 class EpollInstance {
 private:
   int epoll_fd_;
-  std::unordered_map<int, std::unique_ptr<PollDevice>> map_;
+  std::unordered_map<int, std::shared_ptr<PollDevice>> map_;
   int epoll_init();
 
 public:
   EpollInstance() : epoll_fd_(epoll_init()), map_() {};
-  void AddReadDevice(std::unique_ptr<PollDevice> dev);
-  void AddWriteDevice(std::unique_ptr<PollDevice> dev);
+  // Adds a device to the epoll instance and starts polling
+  // for reads. Use this function if your device needs to be deallocated
+  // and want epoll to manage that deallocation
+  void AddDevice(std::unique_ptr<PollDevice> dev);
+
+  // Adds a device to the epoll instance and starts polling
+  // for reads. Use this function if you need to manually
+  // manage the lifetime of your device
+  void AddDeviceUnmanaged(PollDevice *dev);
+
+  // Enables polling for the write end of the fd as well
+  void SetWrite(int fd, bool enable, PollDevice *instance);
+
+  // Removes the device from the epoll instance. If the
+  // device was added through AddDevice(), the device
+  // will be deallocated as well
   void RemoveDevice(int fd);
+
+  // General run loop that polls all epoll instances and
+  // runs their on_poll() functions when polled
   void Run();
 };
 
@@ -43,21 +60,26 @@ private:
   int fd_;
   HidStructs::HidReport &rep_;
   WriteInterface &writer_;
+  std::unique_ptr<HidStructs::EvdevHandler> handler_;
   libevdev *dev_;
   bool mark_delete_;
 
 public:
   EvdevPollDevice(int fd, libevdev *dev, HidStructs::HidReport &rep,
+                  std::unique_ptr<HidStructs::EvdevHandler> handler,
                   WriteInterface &writer)
-      : fd_(fd), rep_(rep), dev_(dev), writer_(writer), mark_delete_(false) {}
+      : fd_(fd), rep_(rep), dev_(dev), writer_(writer), mark_delete_(false),
+        handler_(std::move(handler)) {}
   int fd() override { return fd_; }
   void OnPoll() override;
   bool ShouldDelete() override { return mark_delete_; }
+
   ~EvdevPollDevice() override {
     libevdev_free(dev_);
     close(fd_);
   };
 };
+
 class UdevPollDevice : public PollDevice {
 private:
   udev *udev_;

@@ -123,7 +123,7 @@ uint8_t const desc_configuration[] = {
     // In address, size & polling interval
     TUD_HID_INOUT_DESCRIPTOR(ITF_NUM_HID, 0, HID_ITF_PROTOCOL_NONE,
                              sizeof(desc_hid_report), EPNUM_HID_OUT,
-                             EPNUM_HID_IN, CFG_TUD_HID_EP_BUFSIZE, 10)};
+                             EPNUM_HID_IN, CFG_TUD_HID_EP_BUFSIZE, 1)};
 
 // Invoked when received GET CONFIGURATION DESCRIPTOR
 // Application return pointer to descriptor

@@ -13,7 +13,7 @@ int main() {
   Poll::EpollInstance epoll = Poll::EpollInstance();
   Poll::CoutWrite writer = Poll::CoutWrite();
   auto uvdev = std::make_unique<Poll::UdevPollDevice>(epoll, rep, writer);
-  epoll.AddReadDevice(std::move(uvdev));
+  epoll.AddDevice(std::move(uvdev));
 
   epoll.Run();
 

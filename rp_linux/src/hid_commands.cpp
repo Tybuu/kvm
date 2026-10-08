@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <cstring>
 #include <hid_commands.hpp>
+#include <iostream>
 #include <scan_codes.hpp>
 #include <variant>
 
@@ -258,65 +259,6 @@ std::uint8_t EvCodeToHidCode(std::uint16_t code) {
 } // namespace
 
 namespace HidStructs {
-bool HidReport::process_input(const input_event &evt) {
-  switch (evt.type) {
-  case EV_REL: {
-    auto *ptr = std::get_if<HidStructs::MouseState>(&state_);
-    if (ptr == nullptr) {
-      HidStructs::MouseState state{};
-      state_ = state;
-      ptr = std::get_if<HidStructs::MouseState>(&state_);
-    }
-    switch (evt.code) {
-    case REL_X:
-      ptr->x += evt.value;
-      break;
-    case REL_Y:
-      ptr->y += evt.value;
-      break;
-    case REL_WHEEL:
-    case REL_WHEEL_HI_RES:
-      ptr->wheel += evt.value;
-      break;
-    }
-    return false;
-  }
-  case EV_SYN: {
-    if (std::holds_alternative<HidStructs::MouseState>(state_)) {
-      return true;
-    } else {
-      return false;
-    }
-  }
-  case EV_KEY: {
-    if (evt.code >= BTN_LEFT && evt.code <= BTN_EXTRA) {
-      HidStructs::MouseButtonState state;
-      state.button_code = EvCodeToHidCode(evt.code);
-      if (evt.value == 1 || evt.value == 0) {
-        state.pressed = evt.value == 1;
-        state_ = state;
-        return true;
-      } else {
-        // shouldn't reach this branch as we disabled held keys which return a
-        // value of 2
-        return false;
-      }
-    } else {
-      HidStructs::KeyState state;
-      state.keycode = EvCodeToHidCode(evt.code);
-      if (evt.value == 1 || evt.value == 0) {
-        state.pressed = evt.value == 1;
-        state_ = state;
-        return true;
-      } else {
-        return false;
-      }
-    }
-  }
-  default:
-    return false;
-  }
-}
 
 bool HidReport::process_key(const KeyState &state) {
   if (state.keycode < HID_KEY_KEYPAD_HEXADECIMAL) {
@@ -389,47 +331,94 @@ std::uint8_t HidReport::SerializeMouse(uint8_t *buffer) {
   return 10;
 }
 
-std::uint8_t HidReport::GenerateReport(const input_event &evt,
-                                       uint8_t *buffer) {
-  if (process_input(evt)) {
-    std::uint8_t res = std::visit(
-        overloaded{
-            [](const std::monostate &_arg) { return static_cast<uint8_t>(0); },
-            [this, buffer](const HidStructs::KeyState &key) {
-              if (process_key(key)) {
-                uint8_t res = SerializeNKRO(buffer);
-                state_ = std::monostate{};
-                return res;
-              } else {
-                return static_cast<uint8_t>(0);
-              };
-            },
-            [this, buffer](const HidStructs::MouseState &mouse) {
-              if (process_mouse(mouse)) {
-                uint8_t res = SerializeMouse(buffer);
-                mouse_.x = 0;
-                mouse_.y = 0;
-                mouse_.wheel = 0;
-                state_ = std::monostate{};
-                return res;
-              } else {
-                return static_cast<uint8_t>(0);
-              };
-            },
-            [this, buffer](const HidStructs::MouseButtonState &buttons) {
-              if (process_buttons(buttons)) {
-                uint8_t res = SerializeMouse(buffer);
-                state_ = std::monostate{};
-                return res;
-              } else {
-                return static_cast<uint8_t>(0);
-              };
-            },
-        },
-        state_);
-    return res;
-  } else {
-    return 0;
+HidStructs::HidState KeyboardPollDevice::HandleEvEvent(const input_event &evt) {
+  HidState state = std::monostate();
+  if (evt.type == EV_KEY) {
+    HidStructs::KeyState key_state;
+    key_state.keycode = EvCodeToHidCode(evt.code);
+    if (evt.value == 1 || evt.value == 0) {
+      key_state.pressed = evt.value == 1;
+      state = key_state;
+    }
   }
+  return state;
 }
+
+HidStructs::HidState MousePollDevice::HandleEvEvent(const input_event &evt) {
+  switch (evt.type) {
+  case EV_REL: {
+    switch (evt.code) {
+    case REL_X:
+      state_.x += evt.value;
+      break;
+    case REL_Y:
+      state_.y += evt.value;
+      break;
+    case REL_WHEEL:
+      state_.wheel += evt.value;
+      break;
+    default:
+      break;
+    }
+  }
+  case EV_SYN: {
+    if (state_.x != 0 || state_.y != 0 || state_.wheel != 0) {
+      return state_;
+    }
+    break;
+  }
+  case EV_KEY: {
+    if (evt.code >= BTN_LEFT && evt.code <= BTN_EXTRA) {
+      HidStructs::MouseButtonState state;
+      state.button_code = EvCodeToHidCode(evt.code);
+      if (evt.value == 1 || evt.value == 0) {
+        state.pressed = evt.value == 1;
+        return state;
+      }
+    }
+    break;
+  }
+  default:
+    break;
+  }
+  return std::monostate();
+}
+
+std::uint8_t HidReport::GenerateReport(const HidStructs::HidState &evt,
+                                       uint8_t *buffer) {
+  std::uint8_t res = std::visit(
+      overloaded{
+          [](const std::monostate &_arg) { return static_cast<uint8_t>(0); },
+          [this, buffer](const HidStructs::KeyState &key) {
+            if (process_key(key)) {
+              uint8_t res = SerializeNKRO(buffer);
+              return res;
+            } else {
+              return static_cast<uint8_t>(0);
+            };
+          },
+          [this, buffer](const HidStructs::MouseState &mouse) {
+            if (process_mouse(mouse)) {
+              uint8_t res = SerializeMouse(buffer);
+              mouse_.x = 0;
+              mouse_.y = 0;
+              mouse_.wheel = 0;
+              return res;
+            } else {
+              return static_cast<uint8_t>(0);
+            };
+          },
+          [this, buffer](const HidStructs::MouseButtonState &buttons) {
+            if (process_buttons(buttons)) {
+              uint8_t res = SerializeMouse(buffer);
+              return res;
+            } else {
+              return static_cast<uint8_t>(0);
+            };
+          },
+      },
+      evt);
+  return res;
+}
+
 } // namespace HidStructs

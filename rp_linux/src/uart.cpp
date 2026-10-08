@@ -1,4 +1,6 @@
 #include "uart.hpp"
+#include "poll.hpp"
+#include <cerrno>
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
@@ -11,7 +13,7 @@
 #include <unistd.h>
 
 Uart::Uart(const std::filesystem::path dev) {
-  fd_ = open(dev.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
+  fd_ = open(dev.c_str(), O_RDWR | O_NOCTTY);
   if (fd_ <= -1) {
     throw std::runtime_error("Error opening serial port " + dev.string());
   }
@@ -85,5 +87,4 @@ void Uart::WriteBytes(const uint8_t *bytes, const uint8_t len) {
     bytes_written += res;
   }
 }
-
 Uart::~Uart() { close(fd_); }

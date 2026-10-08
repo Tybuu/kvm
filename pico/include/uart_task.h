@@ -6,7 +6,7 @@
 #include <stdint.h>
 typedef struct {
   uint16_t len;
-  uint8_t *packet;
+  int start;
 } uart_packet_t;
 // Start the UART peripheral and its DMA task. The UART peripheral will keep
 // receiving in the background and the packets can be processed with
@@ -17,6 +17,9 @@ void start_uart_task(TaskHandle_t handle);
 // must be called before calling this function
 uart_packet_t await_packet();
 
+// Properly derefs the packet as the packet could be overwrapping
+// due to our ciruclar buffer
+uint8_t packet_deref(uart_packet_t *packet, size_t i);
 // Frees the packet from await_packet. Must be called after await_packet returns
 void free_packet(uart_packet_t *packet);
 #endif // UART_TASK_H

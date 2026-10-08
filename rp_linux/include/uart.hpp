@@ -3,9 +3,12 @@
 #include "poll.hpp"
 #include <cstdint>
 #include <filesystem>
+const size_t BUFFER_SIZE = 1024;
 class Uart : public Poll::WriteInterface {
 private:
-  int fd_ = -1;
+  int fd_;
+
+  void flush();
 
 public:
   Uart(const Uart &) = delete;

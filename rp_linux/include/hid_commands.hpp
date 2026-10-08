@@ -58,15 +58,28 @@ typedef struct {
 using HidState =
     std::variant<std::monostate, KeyState, MouseState, MouseButtonState>;
 
+class EvdevHandler {
+public:
+  virtual HidStructs::HidState HandleEvEvent(const input_event &evt) = 0;
+};
+
+class KeyboardPollDevice : public EvdevHandler {
+public:
+  HidStructs::HidState HandleEvEvent(const input_event &evt) override;
+};
+
+class MousePollDevice : public EvdevHandler {
+private:
+  HidStructs::MouseState state_;
+
+public:
+  MousePollDevice() : state_(HidStructs::MouseState{}) {}
+  HidStructs::HidState HandleEvEvent(const input_event &evt) override;
+};
 class HidReport {
 private:
   HidReportNKRO nkro_;
   HidMouseReport mouse_;
-  HidState state_;
-
-  // Modifies state_ and returns true if
-  // state_  is ready to be processed
-  bool process_input(const input_event &evt);
 
   // Processes the key state that potentially modifies
   // the internal NKRO report. If the NKRO report is modified,
@@ -84,13 +97,13 @@ private:
   bool process_buttons(const MouseButtonState &state);
 
 public:
-  HidReport() : nkro_{}, mouse_{}, state_{} {};
+  HidReport() : nkro_{}, mouse_{} {};
 
   // Takes in an input_event and attempts to generate an Hid Report
   // if the state changes. If a report is generated, the report
   // will be serialized into the buffer and the number of bytes written
   // is returned. Otherwise, the function will return a 0
-  std::uint8_t GenerateReport(const input_event &evt, std::uint8_t *buffer);
+  std::uint8_t GenerateReport(const HidState &evt, std::uint8_t *buffer);
 
   // Serializes the current NKRO report state into the buffer
   // and returns the number of bytes written

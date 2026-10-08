@@ -12,7 +12,7 @@ int main() {
   Uart uart = Uart("/dev/ttyAMA0");
   // Poll::CoutWrite uart = Poll::CoutWrite();
   auto uvdev = std::make_unique<Poll::UdevPollDevice>(epoll, rep, uart);
-  epoll.AddReadDevice(std::move(uvdev));
+  epoll.AddDevice(std::move(uvdev));
 
   epoll.Run();
 
