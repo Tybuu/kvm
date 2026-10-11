@@ -13,7 +13,7 @@ add_compile_definitions(LIB_CMSIS_CORE=1)
 pico_sdk_init()
 
 # FreeRTOS kernel sources
-set(FREERTOS_KERNEL_PATH "${CMAKE_CURRENT_LIST_DIR}/lib/FreeRTOS-Kernel")
+set(FREERTOS_KERNEL_PATH "${CMAKE_CURRENT_LIST_DIR}/../lib/FreeRTOS-Kernel")
 
 add_library(freertos_kernel
     ${FREERTOS_KERNEL_PATH}/croutine.c
