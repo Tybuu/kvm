@@ -1,0 +1,5 @@
+build/
+build-pi/
+Testing/
+.direnv/
+.cache/
