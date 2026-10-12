@@ -40,8 +40,8 @@ FetchContent_Declare(
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
 if(BUILD_TESTING)
-    FetchContent_MakeAvailable(googletest hidapi)
-    add_executable(PicoKvm src/host_main.cpp ./src/hid_commands.cpp ./src/poll.cpp)
+  FetchContent_MakeAvailable(googletest hidapi)
+    add_executable(PicoKvm src/host_main.cpp ./src/hid_commands.cpp ./src/poll.cpp ./src/middle.cpp)
 else()
     add_executable(PicoKvm src/main.cpp src/uart.cpp ./src/hid_commands.cpp ./src/poll.cpp)
     FetchContent_MakeAvailable(hidapi)

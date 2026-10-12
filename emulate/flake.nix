@@ -34,7 +34,9 @@
               cmake
               gcc-arm-embedded
             ];
-            PICO_SDK_PATH = ../lib/pico-sdk;
+            shellHook = ''
+              export PICO_SDK_PATH="$(pwd)/../lib/pico-sdk"
+            '';
           };
       }
     );

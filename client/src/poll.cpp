@@ -130,7 +130,7 @@ UdevPollDevice::UdevPollDevice(EpollInstance &poll, HidStructs::HidReport &rep,
     throw std::runtime_error("Unable to initialize udev enumeratation");
   }
   udev_enumerate_add_match_subsystem(enumerate, "input");
-  udev_enumerate_add_match_subsystem(enumerate, "hidraw");
+  // udev_enumerate_add_match_subsystem(enumerate, "hidraw");
   int res = udev_enumerate_scan_devices(enumerate);
   if (res < 0) {
     udev_enumerate_unref(enumerate);
@@ -146,47 +146,50 @@ UdevPollDevice::UdevPollDevice(EpollInstance &poll, HidStructs::HidReport &rep,
       const char *devnode = udev_device_get_devnode(dev);
       if (devnode) {
         if (strncmp(devnode, "/dev/input", 10) == 0) {
-          // int fd = open(devnode, O_RDONLY | O_NONBLOCK);
-          // int rep[2] = {0, 0};
-          // ioctl(fd, EVIOCSREP, rep);
-          // if (fd < 0) {
-          //   std::cerr << "Unable to open " << devnode << std::endl;
-          // } else {
-          //   libevdev *evdev = nullptr;
-          //   if (libevdev_new_from_fd(fd, &evdev) >= 0) {
-          //     int is_key = libevdev_has_event_code(evdev, EV_KEY, KEY_A);
-          //     int is_mouse = libevdev_has_event_code(evdev, EV_REL, REL_X);
-          //     if (is_key) {
-          //       std::cout << "Opened Keyboard device: "
-          //                 << libevdev_get_name(evdev) << std::endl;
-          //       auto key =
-          //       std::make_unique<HidStructs::KeyboardPollDevice>();
-          //       std::unique_ptr<EvdevPollDevice> ptr =
-          //           std::make_unique<EvdevPollDevice>(fd, evdev, rep_,
-          //                                             std::move(key),
-          //                                             writer_);
-          //       poll_.AddDevice(std::move(ptr));
-          //     } else if (is_mouse) {
-          //       std::cout << "Opened Mouse device: " <<
-          //       libevdev_get_name(evdev)
-          //                 << std::endl;
-          //       auto mouse = std::make_unique<HidStructs::MousePollDevice>();
-          //       std::unique_ptr<EvdevPollDevice> ptr =
-          //           std::make_unique<EvdevPollDevice>(
-          //               fd, evdev, rep_, std::move(mouse), writer_);
-          //       poll_.AddDevice(std::move(ptr));
-          //     }
-          //   }
-          // }
-        } else if (strncmp(devnode, "/dev/hidraw", 11) == 0) {
-          int fd = open(devnode, O_RDWR | O_NONBLOCK);
+          int fd = open(devnode, O_RDONLY | O_NONBLOCK);
+          int rep[2] = {0, 0};
+          ioctl(fd, EVIOCSREP, rep);
           if (fd < 0) {
-            throw std::runtime_error("hidraw no open");
+            std::cerr << "Unable to open " << devnode << std::endl;
+          } else {
+            libevdev *evdev = nullptr;
+            if (libevdev_new_from_fd(fd, &evdev) >= 0) {
+              int is_key = libevdev_has_event_code(evdev, EV_KEY, KEY_A);
+              int is_mouse = libevdev_has_event_code(evdev, EV_REL, REL_X);
+              if (is_key) {
+                std::cout << "Opened Keyboard device: "
+                          << libevdev_get_name(evdev) << std::endl;
+                auto key = std::make_unique<HidStructs::KeyboardPollDevice>();
+                std::unique_ptr<EvdevPollDevice> ptr =
+                    std::make_unique<EvdevPollDevice>(fd, evdev, rep_,
+                                                      std::move(key), writer_);
+                poll_.AddDevice(std::move(ptr));
+              } else if (is_mouse) {
+                std::cout << "Opened Mouse device: " << libevdev_get_name(evdev)
+                          << std::endl;
+                auto mouse = std::make_unique<HidStructs::MousePollDevice>();
+                std::unique_ptr<EvdevPollDevice> ptr =
+                    std::make_unique<EvdevPollDevice>(
+                        fd, evdev, rep_, std::move(mouse), writer_);
+                poll_.AddDevice(std::move(ptr));
+              }
+            }
           }
-          std::cout << "open hidraw device | " << devnode << std::endl;
-          std::unique_ptr<HidrawPollDevice> ptr =
-              std::make_unique<HidrawPollDevice>(fd);
-          poll_.AddDevice(std::move(ptr));
+        } else if (strncmp(devnode, "/dev/hidraw", 11) == 0) {
+
+          const char *pid = udev_device_get_property_value(dev, "ID_MODEL_ID");
+          const char *vid = udev_device_get_property_value(dev, "ID_VENDOR_ID");
+          if (strncmp(pid, "0728", 4) == 0 && strncmp(vid, "0727", 4) == 0) {
+            int fd = open(devnode, O_RDWR | O_NONBLOCK);
+            if (fd < 0) {
+              throw std::runtime_error("hidraw no open");
+            }
+            std::cout << "open hidraw device " << pid << ", " << vid << " | "
+                      << devnode << std::endl;
+            std::unique_ptr<HidrawPollDevice> ptr =
+                std::make_unique<HidrawPollDevice>(fd);
+            poll_.AddDevice(std::move(ptr));
+          }
         }
       }
       udev_device_unref(dev);

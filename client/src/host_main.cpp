@@ -1,4 +1,5 @@
 #include "hid_commands.hpp"
+#include "middle.hpp"
 #include "poll.hpp"
 #include <cstring>
 #include <fcntl.h>
@@ -6,16 +7,17 @@
 #include <libudev.h>
 #include <memory>
 #include <sys/epoll.h>
+#include <thread>
 #include <unistd.h>
 
 int main() {
   HidStructs::HidReport rep;
   Poll::EpollInstance epoll = Poll::EpollInstance();
-  Poll::CoutWrite writer = Poll::CoutWrite();
+  // Poll::CoutWrite writer = Poll::CoutWrite();
+  Middle::Writer writer = Middle::Writer();
   auto uvdev = std::make_unique<Poll::UdevPollDevice>(epoll, rep, writer);
   epoll.AddDevice(std::move(uvdev));
-
+  std::thread writerThread([&writer]() { writer.Run(); });
   epoll.Run();
-
   return 0;
 }

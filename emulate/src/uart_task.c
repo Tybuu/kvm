@@ -45,6 +45,13 @@ static state_t state;
 static uart_packet_t *cur_packet;
 static uint16_t bytes_read;
 
+void on_uart_rx_dma() {
+  if (dma_channel_get_irq0_status(dma_rx_chan)) {
+    dma_channel_acknowledge_irq0(dma_rx_chan);
+    dma_channel_set_transfer_count(dma_rx_chan, 0xFFFFFFFF, true);
+  }
+}
+
 void start_uart_task() {
   // Initialize global state
   head = 0;
@@ -75,9 +82,9 @@ void start_uart_task() {
 
   // Enable DMA interrupts
   channel_config_set_dreq(&c, dreq_uart_rx);
-  // irq_set_exclusive_handler(DMA_IRQ_0, on_uart_rx_dma);
-  // irq_set_enabled(DMA_IRQ_0, true);
-  // dma_channel_set_irq0_enabled(dma_rx_chan, true);
+  irq_set_exclusive_handler(DMA_IRQ_0, on_uart_rx_dma);
+  irq_set_enabled(DMA_IRQ_0, true);
+  dma_channel_set_irq0_enabled(dma_rx_chan, true);
 
   for (int i = 0; i < NUM_PACKETS; i++) {
     uart_packet_t *packet = &uart_packets[i];
