@@ -76,7 +76,7 @@ int main(void) {
 
   xTaskCreate(usb_task, "USB", 2048, NULL, configMAX_PRIORITIES - 1, &usb);
 
-  xTaskCreate(blink_task, "Blink", 2048, NULL, tskIDLE_PRIORITY + 1, NULL);
+  // xTaskCreate(blink_task, "Blink", 2048, NULL, tskIDLE_PRIORITY + 1, NULL);
   xTaskCreate(uart_task, "uart", 2048, NULL, tskIDLE_PRIORITY + 2, &uart);
 
   stdio_init_all();

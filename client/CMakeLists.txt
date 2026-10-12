@@ -37,10 +37,15 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/libusb/hidapi.git
     GIT_TAG master
 )
+FetchContent_Declare(
+    readerwriterqueue
+    GIT_REPOSITORY https://github.com/cameron314/readerwriterqueue
+    GIT_TAG        v1.0.6
+)
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
 if(BUILD_TESTING)
-  FetchContent_MakeAvailable(googletest hidapi)
+  FetchContent_MakeAvailable(googletest hidapi readerwriterqueue)
     add_executable(PicoKvm src/host_main.cpp ./src/hid_commands.cpp ./src/poll.cpp ./src/middle.cpp)
 else()
     add_executable(PicoKvm src/main.cpp src/uart.cpp ./src/hid_commands.cpp ./src/poll.cpp)
@@ -48,7 +53,7 @@ else()
 endif()
 
 target_include_directories(PicoKvm PRIVATE include)
-target_link_libraries(PicoKvm PRIVATE hidapi::hidapi PkgConfig::LIBEVDEV PkgConfig::LIBUDEV)
+target_link_libraries(PicoKvm PRIVATE hidapi::hidapi PkgConfig::LIBEVDEV PkgConfig::LIBUDEV readerwriterqueue)
 
 if(BUILD_TESTING)
     add_executable(PicoKvmTests tests/test_main.cpp)

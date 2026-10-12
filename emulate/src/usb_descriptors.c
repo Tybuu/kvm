@@ -149,7 +149,7 @@ enum {
 static char const *string_desc_arr[] = {
     (const char[]){0x09, 0x04}, // 0: is supported language is English (0x0409)
     "Tybeast Corp.",            // 1: Manufacturer
-    "Test Device",              // 2: Product
+    "Emulation Device",         // 2: Product
     NULL,                       // 3: Serials will use unique ID if possible
 };
 

@@ -13,7 +13,8 @@
 
 namespace Middle {
 Writer::~Writer() { close(fd_); }
-Writer::Writer() : head_(0), tail_(0), buffer_{}, cv_{}, mutex_{} {
+// Writer::Writer() : head_(0), tail_(0), buffer_{}, cv_{}, mutex_{} {
+Writer::Writer() : packets_(NUM_PACKETS) {
   udev *udev = udev_new();
   fd_ = -1;
   if (udev == nullptr) {
@@ -64,40 +65,25 @@ Writer::Writer() : head_(0), tail_(0), buffer_{}, cv_{}, mutex_{} {
 };
 
 void Writer::WriteBytes(const std::uint8_t *bytes, const uint8_t len) {
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    buffer_[tail_][0] = 0;
-    for (int i = 0; i < len; i++) {
-      buffer_[tail_][i + 1] = bytes[i];
-    }
-    tail_ = (tail_ + 1) % NUM_PACKETS;
+  Packet packet;
+  packet.data[0] = 0;
+  for (int i = 0; i < len; i++) {
+    packet.data[i + 1] = bytes[i];
   }
-  cv_.notify_one();
+  packets_.enqueue(packet);
 }
 
 void Writer::Run() {
-  std::uint8_t buffers[NUM_PACKETS][PACKET_SIZE];
-  int count = 0;
+  Packet packet;
   while (true) {
-    {
-      std::unique_lock<std::mutex> lock(mutex_);
-      cv_.wait(lock, [this] { return head_ != tail_; });
-      count = 0;
-      while (head_ != tail_) {
-        memcpy(buffers[count], buffer_[head_], PACKET_SIZE);
-        head_ = (head_ + 1) % NUM_PACKETS;
-        count += 1;
-      }
-    }
-    for (int i = 0; i < count; i++) {
-      while (true) {
-        int res = write(fd_, buffers[i], PACKET_SIZE);
-        // TODO: Handle writer failures
-        if (res < 0 && errno != EAGAIN) {
-          throw std::runtime_error("HidWriter failed!");
-        } else {
-          break;
-        }
+    packets_.wait_dequeue(packet);
+    while (true) {
+      int res = write(fd_, packet.data, PACKET_SIZE);
+      // TODO: Handle writer failures
+      if (res < 0 && errno != EAGAIN) {
+        throw std::runtime_error("HidWriter failed!");
+      } else {
+        break;
       }
     }
   }
