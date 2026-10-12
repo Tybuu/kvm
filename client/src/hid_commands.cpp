@@ -360,6 +360,7 @@ HidStructs::HidState MousePollDevice::HandleEvEvent(const input_event &evt) {
     default:
       break;
     }
+    break;
   }
   case EV_SYN: {
     if (state_.x != 0 || state_.y != 0 || state_.wheel != 0) {
